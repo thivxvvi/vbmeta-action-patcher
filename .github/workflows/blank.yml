@@ -1,36 +1,57 @@
-# This is a basic workflow to help you get started with Actions
+name: Patch VBMeta
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      ARCHITECTURE:
+        description: 'Architecture'
+        required: true
+        default: 'x86_64'
+        type: choice
+        options:
+        - x86_64
+        - x86
+        - arm64-v8a
+        - armaebi-v7a
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: write
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
+    if: github.event.repository.owner.id == github.event.sender.id
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+ 
+    - name: Check Out
+      uses: actions/checkout@v3.1.0
+      
+    - name: Operating System Information
+      run: |
+        uname -a
+        
+    - name: Patch File Information
+      run: |
+        file ${{ github.event.inputs.ARCHITECTURE }}/vbmeta-disable-verification
+        
+    - name: Give Permissio and Run Patch
+      run: |
+        chmod +x ${{ github.event.inputs.ARCHITECTURE }}/vbmeta-disable-verification
+        ./${{ github.event.inputs.ARCHITECTURE }}/vbmeta-disable-verification vbmeta.img
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+    - name: Upload to Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: vbmeta.img
+        Name: Patched VBMeta
+        draft: false
+        prerelease: true
+        tag: ${{ github.run_id }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        body: |
+          Your vbmeta image are now ready!
+          Flash it now.
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+    - name: Link to Release
+      run: |
+        echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${{ github.run_id }}"
